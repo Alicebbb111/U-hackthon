@@ -1,0 +1,54 @@
+import type { CaseInput, CaseRecord } from '@scamtrap/contracts';
+
+export interface StoredCase extends CaseRecord {
+  ownerId: string;
+}
+
+export interface CaseRepository {
+  create(record: StoredCase): Promise<StoredCase>;
+  listByOwner(ownerId: string): Promise<StoredCase[]>;
+  findById(id: string): Promise<StoredCase | undefined>;
+  save(record: StoredCase): Promise<StoredCase>;
+  delete(id: string): Promise<void>;
+}
+
+export class InMemoryCaseRepository implements CaseRepository {
+  private readonly cases = new Map<string, StoredCase>();
+
+  async create(record: StoredCase) {
+    this.cases.set(record.id, structuredClone(record));
+    return structuredClone(record);
+  }
+
+  async findById(id: string) {
+    const record = this.cases.get(id);
+    return record ? structuredClone(record) : undefined;
+  }
+
+  async listByOwner(ownerId: string) {
+    return [...this.cases.values()]
+      .filter((record) => record.ownerId === ownerId && record.status !== 'deleted')
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .map((record) => structuredClone(record));
+  }
+
+  async save(record: StoredCase) {
+    this.cases.set(record.id, structuredClone(record));
+    return structuredClone(record);
+  }
+
+  async delete(id: string) {
+    this.cases.delete(id);
+  }
+}
+
+export const appendInput = (record: StoredCase, input: CaseInput): StoredCase => ({
+  ...record,
+  status: 'ready',
+  inputs: [...record.inputs, input],
+  updatedAt: new Date().toISOString(),
+});
+
+export const toCaseRecord = ({ ownerId: _ownerId, ...record }: StoredCase): CaseRecord => record;
+
+export { PrismaCaseRepository } from './prisma-case.repository.js';
